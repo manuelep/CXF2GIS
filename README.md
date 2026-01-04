@@ -1,16 +1,3 @@
-# cxf2gis: Libreria Python per il parsing di file CXF catastali e l'integrazione in ambienti GIS e database spaziali.
-
-## Descrizione
-
-cxf2gis è uno strumento progettato per semplificare la gestione dei dati cartografici dell'Agenzia delle Entrate (formato CXF). A differenza degli approcci tradizionali, la libreria permette di gestire il caricamento massivo di interi archivi, armonizzare sistemi di coordinate eterogenei (inclusi i sistemi catastali nativi Cassini-Soldner) e unificare i layer tramite viste SQL su database come PostGIS.
-
-## Contribuisci
-
-I contributi sono benvenuti! Se hai parametri per nuovi centri di emanazione o miglioramenti al parser, apri una Issue o una Pull Request.
-
-
-
-
 # cxf2gis
 
 ## 🇮🇹 ITA
@@ -43,6 +30,15 @@ cxf2gis -h
 
 ```sh
 cxf2gis gpkg -h
+```
+
+#### Esempi
+
+- Export dei file CXF contenuti nella cartella `input_folder` nel file `output_map.gpkg`.
+    È importante specificare il corretto CRS associato ai file di input (nell'esempio ETRF2000)
+
+```sh
+cxf2gis gpkg ./input_folder output_map.gpkg -i EPSG:6707
 ```
 
 ---
@@ -90,6 +86,14 @@ cxf2gis -h
 
 ```sh
 cxf2gis gpkg -h
+```
+
+#### Examples
+- Export CXF files from `input_folder` to the `output_map.gpkg` file.
+  It is important to specify the correct CRS associated with the input files (ETRF2000 in this example).
+
+```sh
+cxf2gis gpkg ./input_folder output_map.gpkg -i EPSG:6707
 ```
 
 ## 🤝 Contributing
