@@ -12,7 +12,7 @@ class CXFProject:
         self.target_epsg = target_epsg
         self.sources = []
 
-    def add_source(self, file_path, input_crs):
+    def add_source(self, file_path, input_crs, extra_info=False):
         """
         Aggiunge un file richiedendo obbligatoriamente il CRS.
         input_crs può essere un codice EPSG o una stringa Proj4 per i sistemi Cassini.
@@ -21,10 +21,10 @@ class CXFProject:
             raise ValueError(f"Dichiarazione CRS obbligatoria per: {file_path}")
         
         # L'istanza riceve sia il CRS sorgente che quello di destinazione
-        source = CXFSource(file_path, input_crs=input_crs, target_epsg=self.target_epsg)
+        source = CXFSource(file_path, input_crs, extra_info=extra_info)
         self.sources.append(source)
 
-    def add_directory(self, folder_path, input_crs, recursive=False):
+    def add_directory(self, folder_path, input_crs, recursive=False, extra_info=False):
         """
         Carica tutti i file .cxf da un percorso con CRS dichiarato.
         """
@@ -32,7 +32,7 @@ class CXFProject:
         pattern = "**/*.cxf" if recursive else "*.cxf"
         
         for file in p.glob(pattern):
-            self.add_source(str(file), input_crs)
+            self.add_source(str(file), input_crs, extra_info=extra_info)
 
     add_sources = add_directory  # Alias per compatibilità
 
@@ -50,6 +50,6 @@ class CXFProject:
             if source.layers:
                 yield source
 
-    def export(self, exporter):
+    def export(self, exporter, target_epsg):
         """L'esportatore ora riceve l'intero progetto (self)"""
-        exporter.export(self)
+        exporter.export(self, target_epsg)

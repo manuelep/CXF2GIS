@@ -3,7 +3,7 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Polygon, Point, LineString
 
-from cxf2gis.comuni import ComuniManager
+from .comuni.base import ComuniManager
 
 # Inizializzazione
 mgr = ComuniManager()
@@ -14,8 +14,8 @@ class CXFSource:
     def __init__(self, file_path, input_epsg="EPSG:6707", exclude_types=None, extra_info=False):
 
         self.file_path = file_path
+        self.meta = self._decripta_nome_file(file_path)
 
-        
         self.exclude_types = exclude_types or []
         self.input_epsg = input_epsg
         # Contenitori per i diversi tipi di geometria
@@ -118,6 +118,8 @@ class CXFSource:
         # Dopo il parsing, trasformiamo le liste in GeoDataFrame riproiettati
         self._finalize_layers()
 
+    parse = _parse  # Alias pubblico
+
     def _finalize_layers(self):
         """ 
         Converte le liste di dizionari in GeoDataFrames, 
@@ -133,13 +135,13 @@ class CXFSource:
             gdf = gpd.GeoDataFrame(data, crs=self.input_epsg)
             
             # 2. Se richiesto extra_info, arricchiamo il GDF con i dati del comune
-            if self.info_comune:
-                for key, value in self.info_comune.items():
+            if self.df_comuni is not None:
+                for key, value in self.df_comuni.items():
                     gdf[f"comune_{key}"] = value
 
             # 3. Trasformazione CRS: il momento cruciale
-            if self.target_epsg and self.input_epsg != self.target_epsg:
-                gdf = gdf.to_crs(self.target_epsg)
+            # if self.target_epsg and self.input_epsg != self.target_epsg:
+            #     gdf = gdf.to_crs(self.target_epsg)
             
             self.layers[layer_name] = gdf
 

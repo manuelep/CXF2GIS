@@ -37,24 +37,27 @@ class ComuniManager:
         if not self.cache_path.exists():
             # Se la cache non esiste, prova a crearla prima di fallire
             self.update_cache()
-            
+
         try:
-            with open(self.cache_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            # Trasformazione diretta da lista di dizionari a DataFrame
-            df = pd.DataFrame(data)
-            
-            # Opzionale: pulizia o rinomina colonne per standardizzarle
-            # Esempio: assicuriamoci che il codice catastale sia sempre maiuscolo
-            if 'codiceCatastale' in df.columns:
-                df['codiceCatastale'] = df['codiceCatastale'].str.upper()
-                
-            return df
-            
+            df_raw = pd.read_json(self.cache_path)
         except Exception as e:
-            print(f"Errore durante la creazione del DataFrame: {e}")
-            return pd.DataFrame() # Restituisce un df vuoto in caso di errore
+            print(f"Errore nel recupero dei dati comuni: {e}")
+            return None
+        else:
+            # Estraiamo le informazioni richieste:
+            # Il dataset contiene oggetti annidati per provincia e regione
+            df_comuni = pd.DataFrame({
+                'codice_catastale': df_raw['codiceCatastale'],
+                'comune_nome': df_raw['nome'],
+                'provincia_sigla': df_raw['sigla'],
+                'provincia_nome': df_raw['provincia'].apply(lambda x: x['nome']),
+                'regione_nome': df_raw['regione'].apply(lambda x: x['nome'])
+            })
+            
+            # Rimuoviamo eventuali duplicati o righe senza codice catastale
+            df_comuni = df_comuni.dropna(subset=['codice_catastale']).drop_duplicates('codice_catastale')
+            
+            return df_comuni
 
     def get_comune(self, codice_catastale):
         """Recupera le info di un comune dalla cache."""
