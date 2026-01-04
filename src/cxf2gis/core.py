@@ -42,3 +42,14 @@ class CXFProject:
         with ProcessPoolExecutor(max_workers=max_workers) as pool:
             tasks = [loop.run_in_executor(pool, s.parse) for s in self.sources]
             await asyncio.gather(*tasks)
+
+    def __iter__(self):
+        """Permette di ciclare direttamente sulle sorgenti del progetto: for src in project:"""
+        for source in self.sources:
+            # Restituiamo la sorgente solo se ha dei dati caricati
+            if source.layers:
+                yield source
+
+    def export(self, exporter):
+        """L'esportatore ora riceve l'intero progetto (self)"""
+        exporter.export(self)
