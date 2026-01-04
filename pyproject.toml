@@ -8,19 +8,49 @@ version = "0.0.1"
 authors = [
   { name="Manuele Pesenti", email="manuele@inventati.org" },
 ]
+
 description = "Python library to parse Italian cadastral CXF files into GIS and spatial databases."
 readme = "README.md"
 requires-python = ">=3.9"
+
+keywords = ["cadastral", "cxf", "gis", "geopandas", "catasto"]
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: GIS",
 ]
+
 license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 
-[project.urls]
-Homepage = "https://github.com/manuelep/CXF2GIS"
-Issues = "https://github.com/manuelep/CXF2GIS/issues"
+# --- DIPENDENZE CORE ---
+# Queste vengono installate sempre con `pip install cxf2gis`
+dependencies = [
+    "geopandas>=0.14.0",
+    "pandas>=2.0.0",
+    "shapely>=2.0.0",
+    "requests>=2.31.0",      # Per il ComuniManager (Matteo Contrini)
+    "pyogrio>=0.7.0",        # Motore ultra-veloce per GPKG (molto meglio di fiona)
+    "rtree>=1.0.0",          # Per operazioni spaziali veloci
+]
+
+# --- DIPENDENZE OPZIONALI (EXTRAS) ---
+# Installabili con `pip install "cxf2gis[postgis]"` o `pip install "cxf2gis[dev]"`
+[project.optional-dependencies]
+postgis = [
+    "psycopg2-binary>=2.9.0", # Driver PostgreSQL
+    "SQLAlchemy>=2.0.0",      # Per l'integrazione to_postgis
+    "geoalchemy2>=0.14.0",    # Supporto tipi spaziali in SQLAlchemy
+]
+dev = [
+    "pytest>=7.0.0",
+    "black",                  # Formattazione codice
+    "isort",                  # Ordinamento import
+]
 
 [project.scripts]
-cxf2gis = "cxf2gis.cli:main"
+cxf2gis = "cxf2gis.exporters.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
