@@ -49,7 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-cxf2gis = "cxf2gis.exporters.cli:main"
+cxf2gis = "cxf2gis.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
