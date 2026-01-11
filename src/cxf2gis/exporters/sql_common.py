@@ -47,36 +47,34 @@ class MetadataManager:
         SQLModel.metadata.create_all(self.engine)
         self.set_description()
 
-    def update_record(self, data_dict: dict):
+    def _update_record(self, data_dict: dict):
         """Inserisce o aggiorna un record (Upsert)."""
-        with self:
-            # Cerchiamo il record esistente
-            statement = select(CXFMetadata).where(CXFMetadata.schema_name == data_dict["schema_name"])
-            results = self.session.exec(statement)
-            record = results.first()
+        # Cerchiamo il record esistente
+        statement = select(CXFMetadata).where(CXFMetadata.schema_name == data_dict["schema_name"])
+        results = self.session.exec(statement)
+        record = results.first()
+        
+        if record:
+            # Aggiornamento (SQLModel gestisce bene l'aggiornamento da dizionario)
+            for key, value in data_dict.items():
+                setattr(record, key, value)
+        else:
+            # Creazione
+            record = CXFMetadata(**data_dict)
             
-            if record:
-                # Aggiornamento (SQLModel gestisce bene l'aggiornamento da dizionario)
-                for key, value in data_dict.items():
-                    setattr(record, key, value)
-            else:
-                # Creazione
-                record = CXFMetadata(**data_dict)
-                
-            self.session.add(record)
+        self.session.add(record)
 
 
-    def _register_archive(self, old_name):
+    def _register_archive(self, new_name):
         """Gestisce il cambio di nome e stato durante l'archiviazione."""
-        with self:
-            statement = select(CXFMetadata).where(CXFMetadata.schema_name == old_name)
-            record = self.session.exec(statement).first()
+        statement = select(CXFMetadata).where(CXFMetadata.schema_name == self.target_schema)
+        record = self.session.exec(statement).first()
+        
+        if record:
+            # Creiamo il nuovo record per l'archivio (le PK non si cambiano facilmente)
+            archive_data = record.dict()
+            archive_data["schema_name"] =  new_name
+            archive_data["record_status"] = "archived"
             
-            if record:
-                # Creiamo il nuovo record per l'archivio (le PK non si cambiano facilmente)
-                archive_data = record.dict()
-                archive_data["schema_name"] =  self.target_schema
-                archive_data["record_status"] = "archived"
-                
-                self.session.delete(record)
-                self.session.add(CXFMetadata(**archive_data))
+            self.session.delete(record)
+            self.session.add(CXFMetadata(**archive_data))

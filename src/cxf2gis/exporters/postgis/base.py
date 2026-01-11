@@ -170,7 +170,7 @@ class PostGISExporter(BaseExporter):
 
         # --- BLOCCO TRANSAZIONALE 2: METADATI E DOCUMENTAZIONE ---
         with PostGISMetadataManager(self.engine, target_schema) as metadata_manager:
-            metadata_manager.update_record({
+            metadata_manager._update_record({
                 "schema_name": target_schema,
                 "extraction_date": file_date,
                 # "import_timestamp": ,
@@ -179,4 +179,3 @@ class PostGISExporter(BaseExporter):
                 "description": f"Importazione CXF2GIS - {len(project.sources)} file"
             })
             metadata_manager._set_schema_description(file_names, file_date)
-        pass
