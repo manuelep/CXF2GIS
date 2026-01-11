@@ -26,10 +26,13 @@ license-files = ["LICEN[CS]E*"]
 # --- DIPENDENZE CORE ---
 # Queste vengono installate sempre con `pip install cxf2gis`
 dependencies = [
+    "SQLAlchemy>=2.0.0",
+    "sqlmodel>=0.0.31",
+    "geoalchemy2>=0.17.1",
     "geopandas>=0.14.0",
     "pandas>=2.0.0",
     "shapely>=2.0.0",
-    "requests>=2.31.0",      # Per il ComuniManager (Matteo Contrini)
+    "requests>=2.31.0",      # Per il ComuniManager
     "pyogrio>=0.7.0",        # Motore ultra-veloce per GPKG (molto meglio di fiona)
     "rtree>=1.0.0",          # Per operazioni spaziali veloci
 ]
