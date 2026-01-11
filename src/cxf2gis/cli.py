@@ -3,12 +3,27 @@ import sys
 from pathlib import Path
 from cxf2gis.core import CXFProject
 from cxf2gis.exporters.geopackage.base import GPKGExporter
-# from cxf2gis.exporters.postgis import PostGISExporter # Sarà aggiunto dopo
+from cxf2gis.exporters.postgis.base import PostGISExporter
 
 def handle_gpkg(args, project):
     """Logica specifica per l'export GeoPackage."""
     print(f"Exporting to GeoPackage: {args.output}...")
     exporter = GPKGExporter(args.output)
+    project.export(exporter, args.target_epsg)
+
+def handle_postgis(args, project):
+    """Logica specifica per l'export PostGIS."""
+    print(f"Exporting to PostGIS database: {args.output}...")
+    # Parsing connection string (es. postgresql://user:pass@host:port/dbname)
+    from urllib.parse import urlparse
+    url = urlparse(args.output)
+    exporter = PostGISExporter(
+        host=url.hostname,
+        database=url.path.lstrip('/'),
+        user=url.username,
+        password=url.password,
+        port=url.port or 5432
+    )
     project.export(exporter, args.target_epsg)
 
 def main():
@@ -28,7 +43,7 @@ def main():
     # --- Sottocomando POSTGIS (Placeholder per il futuro) ---
     pg_parser = subparsers.add_parser("postgis", help="Export to a PostGIS database")
     pg_parser.add_argument("input", help="Source .cxf file or directory")
-    pg_parser.add_argument("-d", "--database", required=True, help="PostgreSQL connection string")
+    pg_parser.add_argument("output", help="Connection string for PostGIS database")
 
     # Opzioni comuni aggiunte a ogni parser (o gestite globalmente)
     for p in [gpkg_parser, pg_parser]:
@@ -63,8 +78,8 @@ def main():
     if args.command == "gpkg":
         handle_gpkg(args, project)
     elif args.command == "postgis":
-        # handle_postgis(args, project)
-        print("PostGIS export not yet implemented.")
+        handle_postgis(args, project)
+        # print("PostGIS export not yet implemented.")
 
     print("Process completed successfully.")
 
