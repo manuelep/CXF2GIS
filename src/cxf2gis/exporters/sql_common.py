@@ -5,6 +5,20 @@ from datetime import date, datetime
 from typing import Optional
 from sqlmodel import Field, SQLModel, create_engine, Session, select
 
+
+class SessionAlreadyActiveError(RuntimeError):
+    """Eccezione sollevata quando si tenta di riaprire una sessione già attiva."""
+    def __init__(self, message="MetadataManager session is already active and cannot be nested."):
+        self.hint = (
+            "HINT: Nested 'with' blocks for MetadataManager are not allowed. "
+            "Ensure you are not initializing a new 'with MetadataManager' context "
+            "inside an existing one. Consider refactoring to reuse the current session."
+        )
+        # Uniamo il messaggio all'hint per una visibilità immediata nei log
+        full_message = f"{message}\n{self.hint}"
+        super().__init__(full_message)
+
+
 class CXFMetadata(SQLModel, table=True):
     __tablename__: str = "cxf_metadata"
     
@@ -25,6 +39,8 @@ class MetadataManager:
         self.target_schema = target_schema
 
     def __enter__(self):
+        if hasattr(self, 'session'):
+            raise SessionAlreadyActiveError()
         self.session = Session(self.engine)
         return self
 
