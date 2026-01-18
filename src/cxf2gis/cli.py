@@ -48,7 +48,7 @@ def main():
     # Opzioni comuni aggiunte a ogni parser (o gestite globalmente)
     for p in [gpkg_parser, pg_parser]:
         p.add_argument("-i", "--input-epsg", required=True, help="Input CRS (e.g. EPSG:3003)")
-        p.add_argument("-t", "--target-epsg", default="EPSG:6704", help="Target CRS (default: EPSG:6704)")
+        p.add_argument("-t", "--target-epsg", default="EPSG:6875", help="Target CRS (default: EPSG:6875)")
         p.add_argument("-r", "--recursive", action="store_true", help="Recursive search")
         p.add_argument("-c", "--comune-info", default=False, action="store_true", help="Include comune info in output")
         p.add_argument("-e", "--extra-info", default=False, action="store_true", help="Include extra info from comuni database")

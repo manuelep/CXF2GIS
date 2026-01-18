@@ -1,88 +1,173 @@
 import os
-import sqlite3
 import datetime
-import pandas as pd
 from pathlib import Path
+from sqlalchemy import text
+from sqlmodel import create_engine, select
+from ..sql_common import MetadataManager, CXFMetadata
+
+import sqlite3
+import pandas as pd
 from ..base import BaseExporter
 
+
+class GeoPackageMetadataManager(MetadataManager):
+    """
+    Gestore metadati per GeoPackage. 
+    In SQLite/GPKG la logica di 'schema' viene traslata sulla gestione del file fisico.
+    -> https://gemini.google.com/share/34588b97d858
+    """
+
+    def __init__(self, engine, gpkg_path: str):
+        super().__init__(engine, target_schema='main') # SQLite usa 'main' come schema predefinito
+        self.gpkg_path = Path(gpkg_path)
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        MetadataManager.__exit__(self, exc_type, exc_value, traceback)
+        self.engine.dispose()
+
+    def _set_description(self):
+        """SQLite non supporta i commenti SQL standard come PostgreSQL."""
+        pass
+    
+    def set_description(self):
+        """Mantenuto per compatibilità, non esegue azioni su SQLite."""
+        pass
+
+    def _set_schema_description(self, file_names, file_date):
+        """Mantenuto per compatibilità, i metadati sono salvati nella tabella CXFMetadata."""
+        pass
+
+    def _check_schema_exists(self):
+        """Verifica se il file fisico esiste."""
+        return self.gpkg_path.exists()
+
+    def _check_table_exists(self):
+        """Verifica l'esistenza della tabella metadati nel GeoPackage."""
+        result = self.session.execute(text(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=:t"
+        ), {"t": CXFMetadata.__tablename__}).scalar()
+        return result > 0
+
+    def _create_schema(self):
+        """In SQLite il database (schema) viene creato all'apertura della connessione."""
+        pass
+
+    def _archive_schema(self):
+        """
+        Archiviazione tramite rinomina del file fisico.
+        Chiude la sessione attiva per permettere al sistema operativo di rinominare il file.
+        """
+        archive_date = datetime.date.today().strftime("%Y_%m_%d")
+        # Genera il nuovo nome: "nome_dati.gpkg" -> "nome_dati_archived_2024_01_01.gpkg"
+        archive_path = self.gpkg_path.with_name(
+            f"{self.gpkg_path.stem}_archived_{archive_date}{self.gpkg_path.suffix}"
+        )
+
+        print(f"Archiviazione file '{self.gpkg_path.name}' -> '{archive_path.name}'...")
+
+        # Importante: Per rinominare un file SQLite/GPKG, non devono esserci connessioni attive
+        # La sessione del MetadataManager deve essere gestita con attenzione
+        if self.session:
+            self.session.close()
+        
+        if archive_path.exists():
+            archive_path.unlink()
+            
+        if self.gpkg_path.exists():
+            self.gpkg_path.rename(archive_path)
+            
+        return str(archive_path)
+
+    def _query_for_metadata(self):
+        """Recupera il record unico di metadati per questo specifico GeoPackage."""
+        statement = select(CXFMetadata)
+        return statement
+
+    def update_metadata(self, file_names: list, file_date: datetime.date):
+        """
+        Popola il record unico di metadati per questo specifico GeoPackage.
+        """
+        data = {
+            "schema_name": self.gpkg_path.stem,
+            "extraction_date": file_date,
+            "source_filenames": ", ".join(file_names),
+            "record_status": "production",
+            "description": self.metadata_description
+        }
+        self._update_record(data)
+
+
 class GPKGExporter(BaseExporter):
+    """ TO DO """
+    
     def __init__(self, output_path):
-        """
-        output_path: percorso del file principale (es. 'dati/catasto.gpkg')
-        """
+        # In SQLAlchemy 2.0 è buona norma usare l'URL di connessione esplicito
         self.output_path = Path(output_path)
+        self.connection_url = f'sqlite:///{self.output_path}'
+        self.engine = create_engine(self.connection_url)
 
-    def _write_internal_metadata(self, file_date, file_names, desc):
-        """Scrive la tabella dei metadati all'interno del file GeoPackage."""
-        with sqlite3.connect(self.output_path) as conn:
-            cursor = conn.cursor()
-            # Crea la tabella se non esiste
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS cxf_metadata (
-                    id INTEGER PRIMARY KEY CHECK (id = 1), -- Garantisce record unico
-                    data_estrazione TEXT,
-                    data_import TEXT,
-                    fonti_files TEXT,
-                    stato TEXT,
-                    descrizione TEXT
-                )
-            """)
+    def prepare_schema(self):
+            """
+            Sostituisce la logica di 'prepare_schema' di PostGIS.
+            Gestisce l'archiviazione del file esistente e la creazione del nuovo.
+            """
+            with GeoPackageMetadataManager(self.engine, self.output_path) as metadata_manager:
             
-            # Inserisce o aggiorna l'unico record di metadati
-            cursor.execute("""
-                INSERT OR REPLACE INTO cxf_metadata (id, data_estrazione, data_import, fonti_files, stato, descrizione)
-                VALUES (1, ?, ?, ?, ?, ?)
-            """, (
-                file_date.isoformat(),
-                datetime.datetime.now().isoformat(),
-                ", ".join(file_names),
-                "production",
-                desc
-            ))
-            conn.commit()
+                # 1. Verifica se il file esiste già
+                if metadata_manager._check_schema_exists():
+                    
+                    # 2. Verifica sicurezza: esiste la tabella metadati?
+                    # Se il file esiste ma non ha i metadati CXF, per sicurezza non lo tocchiamo
+                    if not metadata_manager._check_table_exists():
+                        raise RuntimeError(
+                            f"SICUREZZA: Il file '{self.output_path.name}' esiste ma non è gestito da CXF2GIS. "
+                            "Operazione annullata per evitare sovrascritture accidentali."
+                        )
+                    
+                    # 3. Archiviazione: rinomina il file esistente (es. dati.gpkg -> dati_archived_2024_01_01.gpkg)
+                    # Il metodo _archive_schema gestisce internamente la chiusura della sessione
+                    metadata_manager._archive_schema()
 
-    def export(self, sources, target_epsg):
-        # 1. Recupero informazioni dai file sorgente
-        file_paths = [Path(s.filepath) for s in sources if hasattr(s, 'filepath')]
-        file_names = [p.name for p in file_paths]
-        # Data di estrazione (max tra i file CXF)
-        mtime = max([p.stat().st_mtime for p in file_paths]) if file_paths else datetime.datetime.now().timestamp()
-        file_date = datetime.datetime.fromtimestamp(mtime).date()
+                # 4. Setup del nuovo database (crea tabelle metadati e estensioni GPKG se necessario)
+                # Nota: SQLite crea il file automaticamente alla prima connessione/operazione
+                metadata_manager.setup_database()
+                metadata_manager.session.commit()
+            pass
+    
+    def export(self, project, target_epsg):
+        """
+        Esegue l'integrazione dei sorgenti e la scrittura nel GeoPackage.
+        """
+        # Recupero info dai file sorgenti tramite la classe base
+        file_date, file_names = self._get_file_info(project)
+        
+        # Preparazione dell'output (archiviazione eventuale file precedente)
+        self.prepare_schema()
 
-        # 2. Gestione Archiviazione del file esistente
-        if self.output_path.exists():
-            # Recuperiamo la data dal vecchio file per la rinomina
-            old_mtime = self.output_path.stat().st_mtime
-            old_date_str = datetime.datetime.fromtimestamp(old_mtime).strftime("%Y-%m-%d")
+        # 1. Ciclo sui layer processati dalla logica comune di merge
+        for table_name, merged_gdf in self._merge_sources(project.sources, target_epsg):
+            print(f"Scrittura layer GeoPackage: {table_name} -> {self.output_path.name}")
             
-            # Costruiamo il nome dell'archivio: catasto-archived-2024-05-20.gpkg
-            archive_name = self.output_path.stem + f"-archived-{old_date_str}" + self.output_path.suffix
-            archive_path = self.output_path.parent / archive_name
-            
-            print(f"Archiviazione file esistente in: {archive_path}")
-            
-            # Se l'archivio esiste già, lo rimuoviamo o lo sovrascriviamo
-            if archive_path.exists():
-                archive_path.unlink()
-            
-            # Rinomina fisica
-            self.output_path.rename(archive_path)
-            
-            # Aggiornamento dello stato nel file appena archiviato
-            with sqlite3.connect(archive_path) as conn:
-                conn.execute("UPDATE cxf_metadata SET stato = 'archived' WHERE id = 1")
-                conn.commit()
-
-        for table_name, merged_gdf in self._merge_sources(sources, target_epsg):
-            # Scrittura nuovi layer nel nuovo file
+            # 2. Scrittura del GeoDataFrame come layer del file GPKG
+            # Usiamo to_file con driver GPKG, che è lo standard per GeoPandas
             merged_gdf.to_file(
                 self.output_path, 
                 layer=table_name, 
-                driver="GPKG",
-                engine="pyogrio"
+                driver="GPKG", 
+                engine="pyogrio"  # Consigliato per performance se disponibile
             )
 
-        # 5. Scrittura Metadati Interni
-        desc = f"Esportazione catastale prodotta da CXF2GIS"
-        self._write_internal_metadata(file_date, file_names, desc)
-        print(f"Esportazione completata: {self.output_path}")
+        # 3. Aggiornamento dei metadati nel file appena creato
+        # Nota: Usiamo il context manager per garantire il commit della sessione
+        self.engine = create_engine(self.connection_url)  # Riapriamo l'engine per sicurezza
+        with GeoPackageMetadataManager(self.engine, self.output_path) as metadata_manager:
+            metadata_manager._update_record({
+                "schema_name": self.output_path.stem,
+                "extraction_date": file_date,
+                "source_filenames": ", ".join(file_names),
+                "record_status": "production",
+                "description": f"Export GPKG - {len(project.sources)} sorgenti"
+            })
+            # Metodi mantenuti per compatibilità con l'interfaccia PostGIS
+            # metadata_manager.set_description()
+        pass

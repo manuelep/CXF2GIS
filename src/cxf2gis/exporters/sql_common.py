@@ -1,9 +1,6 @@
-from sqlmodel import Session, select, SQLModel
-from sqlalchemy import text
-
+from sqlmodel import Session, select, SQLModel, Field
 from datetime import date, datetime
 from typing import Optional
-from sqlmodel import Field, SQLModel, create_engine, Session, select
 
 
 class SessionAlreadyActiveError(RuntimeError):
@@ -34,7 +31,7 @@ class MetadataManager:
 
     metadata_description = 'Registry of CXF data imports managed by CXF2GIS.'
 
-    def __init__(self, engine, target_schema='cadastre'):
+    def __init__(self, engine, target_schema):
         self.engine = engine
         self.target_schema = target_schema
 
@@ -46,7 +43,7 @@ class MetadataManager:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.session.commit()
-        self.session.__exit__(exc_type, exc_value, traceback)
+        self.session.close()
         del self.session
 
     def _set_description(self):
@@ -63,10 +60,15 @@ class MetadataManager:
         SQLModel.metadata.create_all(self.engine)
         self.set_description()
 
+    def _query_for_metadata(self):
+        raise NotImplementedError()
+
     def _update_record(self, data_dict: dict):
         """Inserisce o aggiorna un record (Upsert)."""
+        # Assicuriamoci che le tabelle esistano
+        self.setup_database()
         # Cerchiamo il record esistente
-        statement = select(CXFMetadata).where(CXFMetadata.schema_name == data_dict["schema_name"])
+        statement = self._query_for_metadata()
         results = self.session.exec(statement)
         record = results.first()
         

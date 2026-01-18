@@ -4,13 +4,20 @@ from pathlib import Path
 import pandas as pd
 import geopandas as gpd
 from sqlalchemy import create_engine, text
-from sqlmodel import Session
+from sqlmodel import select
 from ..base import BaseExporter
 from ..sql_common import MetadataManager, CXFMetadata
 
 
 class PostGISMetadataManager(MetadataManager):
     """ """
+
+    def __init__(self, engine, target_schema='cadastre'):
+        super().__init__(engine, target_schema=target_schema)
+
+    def _query_for_metadata(self):
+        statement = select(CXFMetadata).where(CXFMetadata.schema_name == data_dict["schema_name"])
+        return statement
 
     def _set_description(self):
         self.session.execute(
@@ -70,16 +77,6 @@ class PostGISExporter(BaseExporter):
         # In SQLAlchemy 2.0 è buona norma usare l'URL di connessione esplicito
         connection_url = f'postgresql://{user}:{password}@{host}:{port}/{database}'
         self.engine = create_engine(connection_url)
-
-    def _get_file_info(self, project):
-        file_paths = [Path(src.file_path) for src in project.sources if hasattr(src, 'file_path')]
-        if not file_paths:
-            return datetime.date.today(), ["unknown_source"]
-        
-        mtime = max([p.stat().st_mtime for p in file_paths])
-        file_date = datetime.datetime.fromtimestamp(mtime).date()
-        file_names = [p.name for p in file_paths]
-        return file_date, file_names
 
     def prepare_schema(self, target_schema):
         with PostGISMetadataManager(self.engine, target_schema) as metadata_manager:

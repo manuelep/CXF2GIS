@@ -1,7 +1,19 @@
+import datetime
+from pathlib import Path
 from sqlalchemy import create_engine, text
 import pandas as pd
 
 class BaseExporter:
+
+    def _get_file_info(self, project):
+        file_paths = [Path(src.file_path) for src in project.sources if hasattr(src, 'file_path')]
+        if not file_paths:
+            return datetime.date.today(), ["unknown_source"]
+        
+        mtime = max([p.stat().st_mtime for p in file_paths])
+        file_date = datetime.datetime.fromtimestamp(mtime).date()
+        file_names = [p.name for p in file_paths]
+        return file_date, file_names
 
     def export(self, sources, target_epsg):
         raise NotImplementedError
