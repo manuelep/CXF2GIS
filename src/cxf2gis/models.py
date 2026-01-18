@@ -132,8 +132,12 @@ class CXFSource:
                 continue
             
             # 1. Crea il GeoDataFrame con il CRS di input (es. Cassini o Gauss-Boaga)
-            gdf = gpd.GeoDataFrame(data, crs=self.input_epsg)
-            
+            try:
+                gdf = gpd.GeoDataFrame(data, crs=self.input_epsg)
+            except Exception as e:
+                import pdb; pdb.set_trace()
+                raise
+
             # 2. Se richiesto extra_info, arricchiamo il GDF con i dati del comune
             if self.df_comuni is not None:
                 for key, value in self.df_comuni.items():

@@ -35,6 +35,8 @@ dependencies = [
     "requests>=2.31.0",      # Per il ComuniManager
     "pyogrio>=0.7.0",        # Motore ultra-veloce per GPKG (molto meglio di fiona)
     "rtree>=1.0.0",          # Per operazioni spaziali veloci
+    "sqlitedict>=2.1.0",
+    "dotenv>=0.0.9",         # Per caricare variabili d'ambiente da .env
 ]
 
 # --- DIPENDENZE OPZIONALI (EXTRAS) ---

@@ -4,6 +4,10 @@ from pathlib import Path
 from cxf2gis.core import CXFProject
 from cxf2gis.exporters.geopackage.base import GPKGExporter
 from cxf2gis.exporters.postgis.base import PostGISExporter
+import os
+from dotenv import load_dotenv
+from getpass import getpass
+from cxf2gis.exporters.projtools.prgcloud import PrgCloudCache
 
 def handle_gpkg(args, project):
     """Logica specifica per l'export GeoPackage."""
@@ -58,6 +62,25 @@ def main():
     # 1. Preparazione Progetto
     project = CXFProject(target_epsg=args.target_epsg)
     input_path = Path(args.input)
+
+    load_dotenv()
+    if args.input_epsg.upper() == 'PRGCLOUD':
+        prgcloud_user = os.getenv("PRGCLOUD_USERNAME")
+        prgcloud_pass = os.getenv("PRGCLOUD_PASSWORD")
+        
+        if not prgcloud_user:
+            os.environ['PRGCLOUD_USERNAME'] = input("Enter PRGCLOUD Username: ")
+        if not prgcloud_pass:
+            os.environ['PRGCLOUD_PASSWORD'] = getpass("Enter PRGCLOUD Password: ")
+
+        for src in project.sources:
+            src.set_prgcloud_credentials(prgcloud_user, prgcloud_pass)
+        
+        prgcloud = PrgCloudCache(
+            username=os.getenv("PRGCLOUD_USERNAME"),
+            password=os.getenv("PRGCLOUD_PASSWORD")
+        )
+        args.input_epsg = prgcloud
 
     # 2. Caricamento file (Logica unificata)
     if input_path.is_file():

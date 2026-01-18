@@ -65,8 +65,6 @@ class MetadataManager:
 
     def _update_record(self, data_dict: dict):
         """Inserisce o aggiorna un record (Upsert)."""
-        # Assicuriamoci che le tabelle esistano
-        self.setup_database()
         # Cerchiamo il record esistente
         statement = self._query_for_metadata()
         results = self.session.exec(statement)
@@ -81,7 +79,6 @@ class MetadataManager:
             record = CXFMetadata(**data_dict)
             
         self.session.add(record)
-
 
     def _register_archive(self, new_name):
         """Gestisce il cambio di nome e stato durante l'archiviazione."""

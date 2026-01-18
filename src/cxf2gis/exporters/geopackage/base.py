@@ -23,7 +23,8 @@ class GeoPackageMetadataManager(MetadataManager):
 
     def __exit__(self, exc_type, exc_value, traceback):
         MetadataManager.__exit__(self, exc_type, exc_value, traceback)
-        self.engine.dispose()
+        # Non disporre l'engine qui perché potrebbe essere riutilizzato dal chiamante
+        # self.engine.dispose()
 
     def _set_description(self):
         """SQLite non supporta i commenti SQL standard come PostgreSQL."""
@@ -130,8 +131,8 @@ class GPKGExporter(BaseExporter):
 
                 # 4. Setup del nuovo database (crea tabelle metadati e estensioni GPKG se necessario)
                 # Nota: SQLite crea il file automaticamente alla prima connessione/operazione
-                metadata_manager.setup_database()
-                metadata_manager.session.commit()
+                # metadata_manager.setup_database()
+                # metadata_manager.session.commit()
             pass
     
     def export(self, project, target_epsg):
@@ -150,13 +151,18 @@ class GPKGExporter(BaseExporter):
             
             # 2. Scrittura del GeoDataFrame come layer del file GPKG
             # Usiamo to_file con driver GPKG, che è lo standard per GeoPandas
+            # mode='a' (append) previene la ricreazione del file, preservando le tabelle esistenti (es. cxf_metadata)
             merged_gdf.to_file(
                 self.output_path, 
                 layer=table_name, 
                 driver="GPKG", 
-                engine="pyogrio"  # Consigliato per performance se disponibile
+                engine="pyogrio",  # Consigliato per performance se disponibile
+                mode='a'  # Append mode: non ricrea il file, aggiunge solo il layer
             )
 
+        with GeoPackageMetadataManager(self.engine, self.output_path) as metadata_manager:
+            metadata_manager.setup_database()
+            metadata_manager.session.commit()
         # 3. Aggiornamento dei metadati nel file appena creato
         # Nota: Usiamo il context manager per garantire il commit della sessione
         self.engine = create_engine(self.connection_url)  # Riapriamo l'engine per sicurezza
